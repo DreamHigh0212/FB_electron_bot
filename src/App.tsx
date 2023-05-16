@@ -258,7 +258,7 @@ function App() {
                 );
                 await commentBox?.click();
                 let posts = csvData[i]["Post"].split("\n");
-                await commentBox?.type(posts[0], { delay: 30 });
+                await commentBox?.type(posts[0], { delay: 10 });
                 await page.keyboard.press("Enter");
                 // await the comment to be posted(by checking if the post contain the comment which don't have )
                 let autoSpans = await post?.$$(`span[dir="auto"]`);
@@ -272,6 +272,10 @@ function App() {
                   autoSpans = await post?.$$(`span[dir="auto"]`);
                 }
                 await browser.close();
+                message.success({
+                  content: "Successfully commented on post and liked it",
+                  key: "uploading",
+                });
                 await page.waitForTimeout(
                   values.timeType === "hours" ?
                     Number(values.time) * 60 * 60 * 1000 :
@@ -279,10 +283,6 @@ function App() {
                       Number(values.time) * 60 * 1000 :
                       Number(values.time) * 1000
                 )
-                message.success({
-                  content: "Successfully commented on post and liked it",
-                  key: "uploading",
-                });
 
                 // await the comment to be posted
               } catch (error) {
@@ -521,6 +521,10 @@ function App() {
                 });
                 await page?.waitForTimeout(3000);
                 await browser.close();
+                message.success({
+                  content: "Successfully commented on post and liked it",
+                  key: "uploading",
+                });
                 await page.waitForTimeout(
                   values.timeType === "hours" ?
                     Number(values.time) * 60 * 60 * 1000 :
@@ -626,6 +630,7 @@ function App() {
         <Form.Item
           name="time"
           label="Time Delay"
+          initialValue={0}
           rules={[
             {
               required: true,
@@ -637,12 +642,12 @@ function App() {
             allowClear
             type="number"
             min={0}
-            defaultValue={0}
             max={100000}
           />
         </Form.Item>
         <Form.Item
           name="timeType"
+          initialValue={"milliseconds"}
           rules={[
             {
               required: true,
