@@ -125,11 +125,11 @@ function App() {
           const browser = await playwright.chromium.launch({
             timeout: 0,
             headless: false,
-            // proxy: {
-            //   server: proxyserver,
-            //   username: proxyusernfame,
-            //   password: proxypassword,
-            // },
+            proxy: {
+              server: proxyserver,
+              username: proxyusername,
+              password: proxypassword,
+            },
           });
           await browser
             .newContext({
@@ -259,12 +259,6 @@ function App() {
                 await commentBox?.click();
                 await commentBox?.type(csvData[i]["Post"], { delay: 30 });
                 await page.keyboard.press("Enter");
-                const comments = await post?.$$(`div[role="article"]`);
-
-                message.info({
-                  content: "Logging out",
-                  key: "uploading",
-                });
                 // await the comment to be posted(by checking if the post contain the comment which don't have )
                 let autoSpans = await post?.$$(`span[dir="auto"]`);
                 // check if there is an autospan which has `Posting...` as text in it
@@ -285,6 +279,11 @@ function App() {
                     ? values.time * 1000
                     : 0
                 );
+                await browser.close();
+                message.success({
+                  content: "Successfully commented on post and liked it",
+                  key: "uploading",
+                });
 
                 // await the comment to be posted
               } catch (error) {
@@ -301,11 +300,6 @@ function App() {
               });
             });
         }
-
-        // message.success({
-        //   content: "Successfully commented on post and liked it",
-        //   key: "uploading",
-        // });
 
         for (let i = 0; i <= csvData.length; i++) {
           message.loading({
@@ -341,11 +335,11 @@ function App() {
           const browser = await playwright.chromium.launch({
             timeout: 0,
             headless: false,
-            // proxy: {
-            //   server: proxyserver,
-            //   username: proxyusername,
-            //   password: proxypassword,
-            // },
+            proxy: {
+              server: proxyserver,
+              username: proxyusername,
+              password: proxypassword,
+            },
           });
 
           await browser
@@ -517,13 +511,10 @@ function App() {
                     const reactionButtons = await reactionsDialog?.$$(
                       "div[role='button']"
                     );
-                    // random index(60 % chance of liking, 40 % chance of other reactions)
-
                     const randomIndex =
                       Math.floor(Math.random() * 10) < 6
                         ? 0
                         : Math.floor(Math.random() * 4) + 1;
-                    // console.log(randomIndex);
                     await reactionButtons![randomIndex].click();
                   }
                 }
@@ -533,6 +524,8 @@ function App() {
                   }`,
                   key: "uploading",
                 });
+                await page?.waitForTimeout(3000);
+                await browser.close();
                 // delete file(data.csv)
               } catch (error) {
                 console.log(error);
