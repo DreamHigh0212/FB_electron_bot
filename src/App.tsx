@@ -125,11 +125,11 @@ function App() {
           const browser = await playwright.chromium.launch({
             timeout: 0,
             headless: false,
-            proxy: {
-              server: proxyserver,
-              username: proxyusername,
-              password: proxypassword,
-            },
+            // proxy: {
+            //   server: proxyserver,
+            //   username: proxyusername,
+            //   password: proxypassword,
+            // },
           });
           await browser
             .newContext({
@@ -258,24 +258,22 @@ function App() {
                 );
                 await commentBox?.click();
                 let posts = csvData[i]["Post"].split("\n");
-                await commentBox?.type(posts[0]);
+                await commentBox?.type(posts[0], { delay: 30 });
                 await page.keyboard.press("Enter");
                 // await the comment to be posted(by checking if the post contain the comment which don't have )
                 // check if there is an autospan which has `Posting...` as text in it
-              await page.waitForTimeout(5000);
+                await page.waitForTimeout(5000);
                 await browser.close();
                 message.success({
                   content: "Successfully commented on post and liked it",
                   key: "uploading",
                 });
-                await page.waitForTimeout(
-                  values.timeType === "hours" ?
-                    Number(values.time) * 60 * 60 * 1000 :
-                    values.timeType === "minutes" ?
-                      Number(values.time) * 60 * 1000 :
-                      Number(values.time) * 1000
-                )
-
+                // set a timeout before the new index starts 
+                await new Promise((resolve) => setTimeout(resolve, values.timeType === "hours" ?
+                  Number(values.time) * 60 * 60 * 1000 :
+                  values.timeType === "minutes" ?
+                    Number(values.time) * 60 * 1000 :
+                    Number(values.time) * 1000));
                 // await the comment to be posted
               } catch (error) {
                 message.error({
@@ -326,11 +324,11 @@ function App() {
           const browser = await playwright.chromium.launch({
             timeout: 0,
             headless: false,
-            proxy: {
-              server: proxyserver,
-              username: proxyusername,
-              password: proxypassword,
-            },
+            // proxy: {
+            //   server: proxyserver,
+            //   username: proxyusername,
+            //   password: proxypassword,
+            // },
           });
 
           await browser
@@ -517,13 +515,11 @@ function App() {
                   content: "Successfully commented on post and liked it",
                   key: "uploading",
                 });
-                await page.waitForTimeout(
-                  values.timeType === "hours" ?
-                    Number(values.time) * 60 * 60 * 1000 :
-                    values.timeType === "minutes" ?
-                      Number(values.time) * 60 * 1000 :
-                      Number(values.time) * 1000
-                )
+                await new Promise((resolve) => setTimeout(resolve, values.timeType === "hours" ?
+                  Number(values.time) * 60 * 60 * 1000 :
+                  values.timeType === "minutes" ?
+                    Number(values.time) * 60 * 1000 :
+                    Number(values.time) * 1000));
               } catch (error) {
                 console.log(error);
                 message.error({
