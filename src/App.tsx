@@ -63,8 +63,8 @@ function App() {
   const submit = async (values: {
     csv: RcFile;
     post: string;
-    time: number;
-    timeType: "Hours" | "Minutes" | "Seconds" | "Milliseconds";
+    time: string;
+    timeType: "hours" | "minutes" | "seconds" | "milliseconds";
   }) => {
     // setStarted(true);
     const csvBuffer = await convertcsvIntoBuffer(csv!);
@@ -178,20 +178,20 @@ function App() {
                     key: "uploading",
                   });
                 }
-                const reactions = ["Like", "Love", "Care", "Haha", "Wow"];
+                const reactions = ["Like", "Love", "Care", "Wow"];
                 try {
                   message.info({
                     key: "uploading",
                     content: "Waiting for post to load",
                   });
+
                   await page.waitForSelector(`div[aria-posinset="1"]`, {
                     timeout: 0,
                   });
                 } catch (error) {
                   message.error({
-                    content: `Error Waiting for post to load for profile ${
-                      i + 1
-                    }`,
+                    content: `Error Waiting for post to load for profile ${i + 1
+                      }`,
                     key: "uploading",
                   });
                 }
@@ -246,18 +246,19 @@ function App() {
                   // random index(60 % chance of liking, 40 % chance of other reactions)
                   const randomIndex =
                     Math.random() < 0.6 ? 0 : 1 + Math.floor(Math.random() * 4);
-                  console.log(randomIndex);
                   await reactionButtons![randomIndex]?.click();
                 }
                 message.info({
                   key: "uploading",
                   content: "Commenting on the post",
                 });
+
                 const commentBox = await post?.$(
                   `div[aria-label="Write a comment"][role="textbox"]`
                 );
                 await commentBox?.click();
-                await commentBox?.type(csvData[i]["Post"], { delay: 30 });
+                let posts = csvData[i]["Post"].split("\n");
+                await commentBox?.type(posts[0], { delay: 30 });
                 await page.keyboard.press("Enter");
                 // await the comment to be posted(by checking if the post contain the comment which don't have )
                 let autoSpans = await post?.$$(`span[dir="auto"]`);
@@ -270,16 +271,14 @@ function App() {
                   await page.waitForTimeout(1000);
                   autoSpans = await post?.$$(`span[dir="auto"]`);
                 }
-                await page.waitForTimeout(
-                  values.timeType === "Minutes"
-                    ? values.time * 60 * 1000
-                    : values.timeType === "Hours"
-                    ? values.time * 60 * 60 * 1000
-                    : values.timeType === "Seconds"
-                    ? values.time * 1000
-                    : 0
-                );
                 await browser.close();
+                await page.waitForTimeout(
+                  values.timeType === "hours" ?
+                    Number(values.time) * 60 * 60 * 1000 :
+                    values.timeType === "minutes" ?
+                      Number(values.time) * 60 * 1000 :
+                      Number(values.time) * 1000
+                )
                 message.success({
                   content: "Successfully commented on post and liked it",
                   key: "uploading",
@@ -388,16 +387,15 @@ function App() {
                     key: "uploading",
                   });
                 }
-                const reactions = ["Like", "Love", "Care", "Haha", "Wow"];
+                const reactions = ["Like", "Love", "Care", "Wow"];
                 try {
                   await page.waitForSelector(`div[aria-posinset="1"]`, {
                     timeout: 0,
                   });
                 } catch {
                   message.error({
-                    content: `Error Waiting for post to load for profile ${
-                      i + 1
-                    }`,
+                    content: `Error Waiting for post to load for profile ${i + 1
+                      }`,
                     key: "uploading",
                   });
                 }
@@ -424,7 +422,7 @@ function App() {
                   await allCommentsMenuSeletorMenu?.$$(`div[role="menuitem"]`);
                 const allCommentsItem =
                   allCommentsMenuSeletorMenuItems![
-                    allCommentsMenuSeletorMenuItems!.length - 1
+                  allCommentsMenuSeletorMenuItems!.length - 1
                   ];
                 await allCommentsItem?.click();
                 await post?.waitForSelector(`div[role="article"]`);
@@ -451,16 +449,15 @@ function App() {
                 }
                 if (comments.length === 0) {
                   message.error({
-                    content: `No comments found to react to for profile ${
-                      i + 1
-                    }`,
+                    content: `No comments found to react to for profile ${i + 1
+                      }`,
                     key: "uploading",
                   });
                   return;
                 }
                 for (let i = 0; i < comments.length; i++) {
                   const comment = comments[i];
-                  // check if comment is already liked, given Love, Care, Haha to it
+                  // check if comment is already liked, given Love, Care to it
                   let givenReaction = false;
                   message.info({
                     key: "uploading",
@@ -491,9 +488,8 @@ function App() {
                     );
                     if (!like) {
                       message.error({
-                        content: `Error getting like button for comment ${
-                          i + 1
-                        } for profile ${i + 1}`,
+                        content: `Error getting like button for comment ${i + 1
+                          } for profile ${i + 1}`,
                         key: "uploading",
                       });
                       return;
@@ -519,14 +515,19 @@ function App() {
                   }
                 }
                 message.success({
-                  content: `Successfully reacted to all comments for profile ${
-                    i + 1
-                  }`,
+                  content: `Successfully reacted to all comments for profile ${i + 1
+                    }`,
                   key: "uploading",
                 });
                 await page?.waitForTimeout(3000);
                 await browser.close();
-                // delete file(data.csv)
+                await page.waitForTimeout(
+                  values.timeType === "hours" ?
+                    Number(values.time) * 60 * 60 * 1000 :
+                    values.timeType === "minutes" ?
+                      Number(values.time) * 60 * 1000 :
+                      Number(values.time) * 1000
+                )
               } catch (error) {
                 console.log(error);
                 message.error({
@@ -580,14 +581,14 @@ function App() {
               pattern: new RegExp(
                 // regex for facebook post link
                 "^(https?:\\/\\/)?" +
-                  "(www\\.)?" +
-                  "(m\\.)?" +
-                  "(web\\.)?" +
-                  "facebook.com\\/" +
-                  "[a-zA-Z0-9\\.\\-\\_\\/]+" +
-                  "\\/posts\\/" +
-                  "[0-9]" +
-                  "??[a-zA-Z0-9=&%]+"
+                "(www\\.)?" +
+                "(m\\.)?" +
+                "(web\\.)?" +
+                "facebook.com\\/" +
+                "[a-zA-Z0-9\\.\\-\\_\\/]+" +
+                "\\/posts\\/" +
+                "[0-9]" +
+                "??[a-zA-Z0-9=&%]+"
               ),
               message: "Enter valid post link!",
             },
@@ -632,7 +633,13 @@ function App() {
             },
           ]}
         >
-          <Input allowClear type="number" min={1} max={100000} />
+          <Input
+            allowClear
+            type="number"
+            min={0}
+            defaultValue={0}
+            max={100000}
+          />
         </Form.Item>
         <Form.Item
           name="timeType"
@@ -643,7 +650,10 @@ function App() {
             },
           ]}
         >
-          <Select placeholder="Select time interval type">
+          <Select
+            defaultValue={"milliseconds"}
+            placeholder="Select time interval type"
+          >
             <Select.Option value="hours">Hours</Select.Option>
             <Select.Option value="minutes">Minutes</Select.Option>
             <Select.Option value="seconds">Seconds</Select.Option>
