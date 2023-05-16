@@ -258,19 +258,11 @@ function App() {
                 );
                 await commentBox?.click();
                 let posts = csvData[i]["Post"].split("\n");
-                await commentBox?.type(posts[0], { delay: 10 });
+                await commentBox?.type(posts[0]);
                 await page.keyboard.press("Enter");
                 // await the comment to be posted(by checking if the post contain the comment which don't have )
-                let autoSpans = await post?.$$(`span[dir="auto"]`);
                 // check if there is an autospan which has `Posting...` as text in it
-                while (
-                  autoSpans!.some((span) =>
-                    span!.innerText().then((text) => text === "Posting...")
-                  )
-                ) {
-                  await page.waitForTimeout(1000);
-                  autoSpans = await post?.$$(`span[dir="auto"]`);
-                }
+              await page.waitForTimeout(5000);
                 await browser.close();
                 message.success({
                   content: "Successfully commented on post and liked it",
