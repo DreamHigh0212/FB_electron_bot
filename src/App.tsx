@@ -1,14 +1,11 @@
 import { useState } from "react";
-import { Button, Form, Input, message, Upload } from "antd";
+import { Button, Form, Input, message, Select, Upload } from "antd";
 import { RcFile } from "antd/es/upload";
 import { BsFillInboxesFill } from "react-icons/bs";
 import Playwright from "playwright";
-import Electron from "electron";
 const fs = window.require("fs");
 const playwright = window.require("playwright");
 const csv = window.require("csv-parser");
-const { ipcRenderer }: { ipcRenderer: Electron.IpcRenderer } =
-  window.require("electron");
 const path = window.require("path");
 const { Dragger } = Upload;
 
@@ -38,6 +35,15 @@ const getDataFromCsvAsArray = (path: string) => {
   });
 };
 
+// let checkIfTheyAreMoreComments = async (post: Playwright.ElementHandle<HTMLElement | SVGElement> ) => {
+//   try {
+
+//     return true;
+//   } catch (error) {
+//     return false;
+//   }
+// }
+
 // convert csv file into buffer
 const convertcsvIntoBuffer = (csv: RcFile) => {
   return new Promise<Buffer>((resolve, reject) => {
@@ -54,7 +60,12 @@ const convertcsvIntoBuffer = (csv: RcFile) => {
 function App() {
   const [csv, setCsv] = useState<RcFile | null>(null);
   // const [started, setStarted] = useState(false);
-  const submit = async (values: { csv: RcFile; post: string }) => {
+  const submit = async (values: {
+    csv: RcFile;
+    post: string;
+    time: number;
+    timeType: "Hours" | "Minutes" | "Seconds" | "Milliseconds";
+  }) => {
     // setStarted(true);
     const csvBuffer = await convertcsvIntoBuffer(csv!);
     message.loading({ content: "Uploading...", key: "uploading" });
@@ -69,8 +80,8 @@ function App() {
       fs.writeFileSync(filePath, csvBuffer);
       message.success({ content: "Uploaded csv", key: "uploading" });
     } catch (error) {
-      message.error({ content: "Error uploading csv", key: "uploading" });
       console.log(error);
+      message.error({ content: "Error uploading csv", key: "uploading" });
       // setStarted(false);
       return;
     }
@@ -88,7 +99,7 @@ function App() {
           });
           if (!csvData[i]) {
             message.error({
-              content: `Error Logging in for profile  ${i + 1}`,
+              content: `Undefined profile  ${i + 1}`,
               key: "uploading",
             });
             continue;
@@ -96,7 +107,7 @@ function App() {
           let cookies = csvData[i]["Cookies:"];
           if (!cookies) {
             message.error({
-              content: `Error Logging in for profile  ${i + 1}`,
+              content: `No cookies  for profile  ${i + 1}`,
               key: "uploading",
             });
             continue;
@@ -104,13 +115,21 @@ function App() {
           let proxyserver = csvData[i]["Proxy HTTP"];
           let proxyusername = csvData[i]["proxyusername"];
           let proxypassword = csvData[i]["proxy password"];
+          if (!proxyserver || !proxyusername || !proxypassword) {
+            message.error({
+              content: `No proxy data for profile  ${i + 1}`,
+              key: "uploading",
+            });
+            continue;
+          }
           const browser = await playwright.chromium.launch({
-            // headless: false,
-            proxy: {
-              server: proxyserver,
-              username: proxyusername,
-              password: proxypassword,
-            },
+            timeout: 0,
+            headless: false,
+            // proxy: {
+            //   server: proxyserver,
+            //   username: proxyusernfame,
+            //   password: proxypassword,
+            // },
           });
           await browser
             .newContext({
@@ -150,7 +169,8 @@ function App() {
                     content: "Opening the post",
                   });
                   await page.goto(values.post, {
-                    waitUntil: "networkidle",
+                    waitUntil: "load",
+                    timeout: 0,
                   });
                 } catch (error) {
                   message.error({
@@ -164,7 +184,9 @@ function App() {
                     key: "uploading",
                     content: "Waiting for post to load",
                   });
-                  await page.waitForSelector(`div[aria-posinset="1"]`);
+                  await page.waitForSelector(`div[aria-posinset="1"]`, {
+                    timeout: 0,
+                  });
                 } catch (error) {
                   message.error({
                     content: `Error Waiting for post to load for profile ${
@@ -209,9 +231,11 @@ function App() {
                     `div[aria-label="Like"][role="button"][tabindex="0"]`
                   );
                   await like?.hover();
-                  await page.waitForTimeout(2000);
                   await page.waitForSelector(
-                    `div[aria-label="Reactions"][role="dialog"]`
+                    `div[aria-label="Reactions"][role="dialog"]`,
+                    {
+                      timeout: 0,
+                    }
                   );
                   const reactionsDialog = await page.$(
                     `div[aria-label="Reactions"][role="dialog"]`
@@ -219,9 +243,9 @@ function App() {
                   const reactionButtons = await reactionsDialog?.$$(
                     "div[role='button']"
                   );
-                  const randomIndex = Math.floor(
-                    Math.random() * reactions.length
-                  );
+                  // random index(60 % chance of liking, 40 % chance of other reactions)
+                  const randomIndex =
+                    Math.random() < 0.6 ? 0 : 1 + Math.floor(Math.random() * 4);
                   console.log(randomIndex);
                   await reactionButtons![randomIndex]?.click();
                 }
@@ -233,13 +257,36 @@ function App() {
                   `div[aria-label="Write a comment"][role="textbox"]`
                 );
                 await commentBox?.click();
-                await commentBox?.type(csvData[i]["Post"]);
+                await commentBox?.type(csvData[i]["Post"], { delay: 30 });
                 await page.keyboard.press("Enter");
+                const comments = await post?.$$(`div[role="article"]`);
+
                 message.info({
                   content: "Logging out",
                   key: "uploading",
                 });
-                await page.waitForTimeout(3000);
+                // await the comment to be posted(by checking if the post contain the comment which don't have )
+                let autoSpans = await post?.$$(`span[dir="auto"]`);
+                // check if there is an autospan which has `Posting...` as text in it
+                while (
+                  autoSpans!.some((span) =>
+                    span!.innerText().then((text) => text === "Posting...")
+                  )
+                ) {
+                  await page.waitForTimeout(1000);
+                  autoSpans = await post?.$$(`span[dir="auto"]`);
+                }
+                await page.waitForTimeout(
+                  values.timeType === "Minutes"
+                    ? values.time * 60 * 1000
+                    : values.timeType === "Hours"
+                    ? values.time * 60 * 60 * 1000
+                    : values.timeType === "Seconds"
+                    ? values.time * 1000
+                    : 0
+                );
+
+                // await the comment to be posted
               } catch (error) {
                 message.error({
                   key: "uploading",
@@ -255,10 +302,10 @@ function App() {
             });
         }
 
-        message.success({
-          content: "Successfully commented on post and liked it",
-          key: "uploading",
-        });
+        // message.success({
+        //   content: "Successfully commented on post and liked it",
+        //   key: "uploading",
+        // });
 
         for (let i = 0; i <= csvData.length; i++) {
           message.loading({
@@ -267,7 +314,7 @@ function App() {
           });
           if (!csvData[i]) {
             message.error({
-              content: `Error Logging in for profile  ${i + 1}`,
+              content: `Undefined profile  ${i + 1}`,
               key: "uploading",
             });
             continue;
@@ -275,7 +322,7 @@ function App() {
           let cookies = csvData[i]["Cookies:"];
           if (!cookies) {
             message.error({
-              content: `Error Logging in for profile  ${i + 1}`,
+              content: `No cookies  for profile  ${i + 1}`,
               key: "uploading",
             });
             continue;
@@ -283,13 +330,22 @@ function App() {
           let proxyserver = csvData[i]["Proxy HTTP"];
           let proxyusername = csvData[i]["proxyusername"];
           let proxypassword = csvData[i]["proxy password"];
+          if (!proxyserver || !proxyusername || !proxypassword) {
+            message.error({
+              content: `No proxy data for profile  ${i + 1}`,
+              key: "uploading",
+            });
+            continue;
+          }
+
           const browser = await playwright.chromium.launch({
-            // headless: false,
-            proxy: {
-              server: proxyserver,
-              username: proxyusername,
-              password: proxypassword,
-            },
+            timeout: 0,
+            headless: false,
+            // proxy: {
+            //   server: proxyserver,
+            //   username: proxyusername,
+            //   password: proxypassword,
+            // },
           });
 
           await browser
@@ -320,7 +376,6 @@ function App() {
                 ) as any[],
               },
             })
-
             .then(async (context: Playwright.BrowserContext) => {
               const page = await context.newPage();
               try {
@@ -330,7 +385,8 @@ function App() {
                     content: "Opening the post",
                   });
                   await page.goto(values.post, {
-                    waitUntil: "networkidle",
+                    waitUntil: "load",
+                    timeout: 0,
                   });
                 } catch (error) {
                   message.error({
@@ -340,7 +396,9 @@ function App() {
                 }
                 const reactions = ["Like", "Love", "Care", "Haha", "Wow"];
                 try {
-                  await page.waitForSelector(`div[aria-posinset="1"]`);
+                  await page.waitForSelector(`div[aria-posinset="1"]`, {
+                    timeout: 0,
+                  });
                 } catch {
                   message.error({
                     content: `Error Waiting for post to load for profile ${
@@ -358,10 +416,50 @@ function App() {
                   key: "uploading",
                   content: "Getting comments",
                 });
+                const divspans =
+                  (await post?.$$(
+                    `div[role="button"][tabindex="0"] > span[dir="auto"]`
+                  )) || [];
+                const allCommentsSelectorToggler = divspans[2];
+                await allCommentsSelectorToggler?.click();
+                await page?.waitForSelector(`div[role="menu"]`);
+                const allCommentsMenuSeletorMenu = await page?.$(
+                  `div[role="menu"]`
+                );
+                const allCommentsMenuSeletorMenuItems =
+                  await allCommentsMenuSeletorMenu?.$$(`div[role="menuitem"]`);
+                const allCommentsItem =
+                  allCommentsMenuSeletorMenuItems![
+                    allCommentsMenuSeletorMenuItems!.length - 1
+                  ];
+                await allCommentsItem?.click();
+                await post?.waitForSelector(`div[role="article"]`);
+                // click on the following button then then it will disapper but if they're still more comments it will be there(just continue clicking on it)
+                let moreComments = await post?.$(
+                  `div.x78zum5.x13a6bvl.xexx8yu.x1pi30zi.x18d9i69.x1swvt13.x1n2onr6 > div.x78zum5.x1iyjqo2.x21xpn4.x1n2onr6`
+                );
+
+                while (moreComments) {
+                  await moreComments?.click();
+                  await page?.waitForTimeout(3000);
+                  moreComments = await post?.$(
+                    `div.x78zum5.x13a6bvl.xexx8yu.x1pi30zi.x18d9i69.x1swvt13.x1n2onr6 > div.x78zum5.x1iyjqo2.x21xpn4.x1n2onr6`
+                  );
+                }
+
                 const comments = await post?.$$(`div[role="article"]`);
-                if (!comments || comments.length === 0) {
+                if (!comments) {
                   message.error({
                     content: `Error getting comments for profile ${i + 1}`,
+                    key: "uploading",
+                  });
+                  return;
+                }
+                if (comments.length === 0) {
+                  message.error({
+                    content: `No comments found to react to for profile ${
+                      i + 1
+                    }`,
                     key: "uploading",
                   });
                   return;
@@ -407,9 +505,11 @@ function App() {
                       return;
                     }
                     await like?.hover();
-                    await page.waitForTimeout(2000);
                     await page.waitForSelector(
-                      `div[aria-label="Reactions"][role="dialog"]`
+                      `div[aria-label="Reactions"][role="dialog"]`,
+                      {
+                        timeout: 0,
+                      }
                     );
                     const reactionsDialog = await page.$(
                       `div[aria-label="Reactions"][role="dialog"]`
@@ -417,10 +517,12 @@ function App() {
                     const reactionButtons = await reactionsDialog?.$$(
                       "div[role='button']"
                     );
-                    const randomIndex = Math.floor(
-                      Math.random() * reactions.length
-                    );
+                    // random index(60 % chance of liking, 40 % chance of other reactions)
 
+                    const randomIndex =
+                      Math.floor(Math.random() * 10) < 6
+                        ? 0
+                        : Math.floor(Math.random() * 4) + 1;
                     // console.log(randomIndex);
                     await reactionButtons![randomIndex].click();
                   }
@@ -434,14 +536,17 @@ function App() {
                 // delete file(data.csv)
               } catch (error) {
                 console.log(error);
-                ipcRenderer.send("error-on", i + 1);
+                message.error({
+                  content: `Error reacting to comments for profile ${i + 1}`,
+                  key: "uploading",
+                });
               }
             })
             .catch((error: any) => {
               console.log(error);
-              ipcRenderer.send("login-reply", {
-                message: "error",
-                profile: i + 1,
+              message.error({
+                content: `Error opening browser for profile ${i + 1}`,
+                key: "uploading",
               });
             });
         }
@@ -461,37 +566,6 @@ function App() {
     }
   };
 
-  ipcRenderer.on("error", (_: any, __: any) => {
-    // setStarted(false);
-    message.error({
-      content: "Something went wrong",
-      key: "uploading",
-    });
-  });
-
-  ipcRenderer.on("error-on", (_: any, arg: any) => {
-    // setStarted(false);
-    message.error({
-      content: "Something went wrong with profile " + arg,
-      key: "uploading",
-    });
-  });
-
-  ipcRenderer.on("noitification", (_: any, arg: any) => {
-    if (arg === "finished") {
-      // setStarted(false);
-      message.success({
-        content: "Finished",
-        key: "uploading",
-      });
-    } else {
-      message.info({
-        content: arg,
-        key: "uploading",
-      });
-    }
-  });
-
   return (
     <div className="w-full min-h-screen flex items-center max-w-md mx-auto">
       <Form
@@ -502,7 +576,6 @@ function App() {
         className="bg-white shadow-xl rounded-md px-8 pt-6 pb-8 mb-4"
       >
         <h1 className="text-2xl font-bold mb-4">Facebook Bot</h1>
-        {/* Input post */}
         <Form.Item
           // check if the input is facebook post link
           rules={[
@@ -512,9 +585,9 @@ function App() {
             },
             {
               pattern: new RegExp(
+                // regex for facebook post link
                 "^(https?:\\/\\/)?" +
                   "(www\\.)?" +
-                  // may be from web or mobile
                   "(m\\.)?" +
                   "(web\\.)?" +
                   "facebook.com\\/" +
@@ -522,7 +595,6 @@ function App() {
                   "\\/posts\\/" +
                   "[0-9]" +
                   "??[a-zA-Z0-9=&%]+"
-                // may have some query params (example: ?_rdc=1&_rdr)                  // may have some query params (example: ?_rdc=1&_rdr)
               ),
               message: "Enter valid post link!",
             },
@@ -555,6 +627,35 @@ function App() {
               uploading company data or other banned files.
             </p>
           </Dragger>
+        </Form.Item>
+        {/*  he can pick time he wants just select if the given time is in hours, minutes, seconds or milleseconds */}
+        <Form.Item
+          name="time"
+          label="Time Delay"
+          rules={[
+            {
+              required: true,
+              message: "Please select time interval!",
+            },
+          ]}
+        >
+          <Input allowClear type="number" min={1} max={100000} />
+        </Form.Item>
+        <Form.Item
+          name="timeType"
+          rules={[
+            {
+              required: true,
+              message: "Please select time interval type!",
+            },
+          ]}
+        >
+          <Select placeholder="Select time interval type">
+            <Select.Option value="hours">Hours</Select.Option>
+            <Select.Option value="minutes">Minutes</Select.Option>
+            <Select.Option value="seconds">Seconds</Select.Option>
+            <Select.Option value="milliseconds">Milliseconds</Select.Option>
+          </Select>
         </Form.Item>
         <Button
           type="primary"
