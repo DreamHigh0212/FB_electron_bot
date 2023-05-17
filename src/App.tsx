@@ -87,11 +87,11 @@ function App() {
           const browser = await playwright.chromium.launch({
             timeout: 0,
             headless: false,
-            // proxy: {
-            //   server: proxyserver,
-            //   username: proxyusername,
-            //   password: proxypassword, 
-            // },
+            proxy: {
+              server: proxyserver,
+              username: proxyusername,
+              password: proxypassword, 
+            },
           });
           await browser
             .newContext({
@@ -220,7 +220,7 @@ function App() {
                 );
                 await commentBox?.click();
                 let posts = csvData[i]["Post"].split("\n");
-                await commentBox?.type(posts[0],);
+                await commentBox?.type(posts[0], { delay: 40 });
                 await page.keyboard.press("Enter");
                 while (true) {
                   try {
@@ -302,11 +302,11 @@ function App() {
           const browser = await playwright.chromium.launch({
             timeout: 0,
             headless: false,
-            // proxy: {
-            //   server: proxyserver,
-            //   username: proxyusername,
-            //   password: proxypassword,
-            // },
+            proxy: {
+              server: proxyserver,
+              username: proxyusername,
+              password: proxypassword,
+            },
           });
 
           await browser
@@ -454,7 +454,12 @@ function App() {
                 }
 
                 for (let i = 0; i < comments.length; i++) {
+                  // const comment = comments[i];
+                  if (!commentsToBeLiked.includes(i)) {
+                    continue;
+                  }
                   const comment = comments[i];
+
                   // check if comment is already liked, given Love, Care to it
                   let givenReaction = false;
                   message.info({
