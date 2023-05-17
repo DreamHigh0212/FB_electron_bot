@@ -54,7 +54,7 @@ function App() {
       const csvData = await getDataFromCsvAsArray(csv!);
       message.success({ content: "Imported data", key: "uploading" });
       try {
-        for (let i = 0; i <= csvData.length; i++) {
+        for (let i = 0; i < csvData.length; i++) {
           message.loading({
             content: `Logging in for profile ${i + 1}`,
             key: "uploading",
@@ -90,7 +90,7 @@ function App() {
             proxy: {
               server: proxyserver,
               username: proxyusername,
-              password: proxypassword, 
+              password: proxypassword,
             },
           });
           await browser
@@ -169,7 +169,7 @@ function App() {
                 });
                 for (let i = 0; i < reactions.length; i++) {
                   try {
-                    const reaction = reactions[i === 3 ? 4 : i];
+                    const reaction = reactions[i];
                     const reactionButton = await post?.$(
                       `div[aria-label="Remove ${reaction}"][role="button"]`
                     );
@@ -254,6 +254,7 @@ function App() {
                     Number(values.time) * 1000));
                 // await the comment to be posted
               } catch (error) {
+                console.log(error);
                 message.error({
                   key: "uploading",
                   content: "Error commenting on the post",
@@ -268,7 +269,7 @@ function App() {
             });
         }
 
-        for (let i = 0; i <= csvData.length; i++) {
+        for (let i = 0; i < csvData.length; i++) {
           message.loading({
             content: `Logging in for profile ${i + 1}`,
             key: "uploading",
@@ -376,12 +377,11 @@ function App() {
                   key: "uploading",
                   content: "Getting comments",
                 });
-                const divspans =
-                  (await post?.$$(
-                    `div[role="button"][tabindex="0"] > span[dir="auto"]`
-                  )) || [];
-                const allCommentsSelectorToggler = divspans[2];
-                await allCommentsSelectorToggler?.click();
+                const allCommentsSelectorToggler =
+                  await post?.$(
+                    `div.x6s0dn4.x78zum5.xdj266r.x11i5rnm.xat24cr.x1mh8g0r.xe0p6wg > div[role="button"][tabindex="0"] > span[dir="auto"]`
+                  );
+                await allCommentsSelectorToggler!.click();
                 await page?.waitForSelector(`div[role="menu"]`);
                 const allCommentsMenuSeletorMenu = await page?.$(
                   `div[role="menu"]`
@@ -395,8 +395,6 @@ function App() {
                 await allCommentsItem?.click();
                 await post?.waitForSelector(`div[role="article"]`);
                 // click on the following button then then it will disapper but if they're still more comments it will be there(just continue clicking on it)
-
-
                 while (true) {
                   try {
                     let eleme = await post?.$(`div.x78zum5.x13a6bvl.xexx8yu.x1pi30zi.x18d9i69.x1swvt13.x1n2onr6 > div.x78zum5.x1iyjqo2.x21xpn4.x1n2onr6`);
@@ -425,99 +423,96 @@ function App() {
                   });
                   return;
                 }
-                let minimumCommentsToBeLiked = 5; // min comments to be liked
-                let maxCommentsToBeLiked = csvData.length - 1; // max comments to be liked
-                let randomNumberOfCommentsToBeLiked = Math.floor(
-                  Math.random() *
-                  (maxCommentsToBeLiked - minimumCommentsToBeLiked + 1) +
-                  minimumCommentsToBeLiked
-                );
-
-                if (comments.length < minimumCommentsToBeLiked) {
-                  minimumCommentsToBeLiked = comments.length / 2;
-                }
-                if (comments.length < maxCommentsToBeLiked) {
-                  maxCommentsToBeLiked = comments.length;
-                }
 
                 // the comments must be liked at random too.
-
                 const commentsToBeLiked: number[] = [];
-                while (commentsToBeLiked.length < randomNumberOfCommentsToBeLiked) {
+                let minMumOfCommentsToBeLiked = 5;
+                let maxMumOfCommentsToBeLiked = csvData.length;
+
+                if (minMumOfCommentsToBeLiked > maxMumOfCommentsToBeLiked) {
+                  minMumOfCommentsToBeLiked = maxMumOfCommentsToBeLiked;
+                }
+
+                if (maxMumOfCommentsToBeLiked > comments.length) {
+                  maxMumOfCommentsToBeLiked = comments.length;
+                }
+                let randomNumberOfCommentsTobeLiked = Math.floor(
+                  Math.random() *
+                  (maxMumOfCommentsToBeLiked - minMumOfCommentsToBeLiked + 1) +
+                  minMumOfCommentsToBeLiked
+                );
+
+                while (commentsToBeLiked.length < randomNumberOfCommentsTobeLiked) {
                   const randomCommentIndex = Math.floor(
-                    Math.random() * (maxCommentsToBeLiked - minimumCommentsToBeLiked + 1) +
-                    minimumCommentsToBeLiked
+                    Math.random() * comments.length
                   );
                   if (!commentsToBeLiked.includes(randomCommentIndex)) {
                     commentsToBeLiked.push(randomCommentIndex);
                   }
                 }
-
                 for (let i = 0; i < comments.length; i++) {
                   // const comment = comments[i];
-                  if (!commentsToBeLiked.includes(i)) {
-                    continue;
-                  }
-                  const comment = comments[i];
-
-                  // check if comment is already liked, given Love, Care to it
-                  let givenReaction = false;
-                  message.info({
-                    key: "uploading",
-                    content: `Checking if comment ${i + 1} has been reacted on`,
-                  });
-                  for (let i = 0; i < reactions.length; i++) {
-                    try {
-                      const reaction = reactions[i === 3 ? 4 : i];
-                      const reactionButton = await comment.$(
-                        `div[aria-label="Remove ${reaction}"][role="button"]`
-                      );
-                      if (reactionButton) {
-                        givenReaction = true;
-                        break;
-                      }
-                    } catch (error) {
-                      continue;
-                    }
-                  }
-                  if (givenReaction) {
-                    continue;
-                  }
                   if (commentsToBeLiked.includes(i)) {
+                    const comment = comments[i];
+                    // check if comment is already liked, given Love, Care to it
+                    let givenReaction = false;
                     message.info({
                       key: "uploading",
-                      content: `Reacting to comment ${i + 1}`,
+                      content: `Checking if comment ${i + 1} has been reacted on`,
                     });
-                    const like = await comment.$(
-                      `div[aria-label="Like"][role="button"]`
-                    );
-                    if (!like) {
-                      message.error({
-                        content: `Error getting like button for comment ${i + 1
-                          } for profile ${i + 1}`,
-                        key: "uploading",
-                      });
-                      return;
-                    }
-                    await like?.hover();
-                    await page.waitForSelector(
-                      `div[aria-label="Reactions"][role="dialog"]`,
-                      {
-                        timeout: 0,
+                    for (let i = 0; i < reactions.length; i++) {
+                      try {
+                        const reaction = reactions[i];
+                        const reactionButton = await comment.$(
+                          `div[aria-label="Remove ${reaction}"][role="button"]`
+                        );
+                        if (reactionButton) {
+                          givenReaction = true;
+                          break;
+                        }
+                      } catch (error) {
+                        continue;
                       }
-                    );
-                    const reactionsDialog = await page.$(
-                      `div[aria-label="Reactions"][role="dialog"]`
-                    );
-                    const reactionButtons = await reactionsDialog?.$$(
-                      "div[role='button']"
-                    );
-                    const randomIndex =
-                      Math.floor(Math.random() * 10) < 6
-                        ? 0
-                        : Math.floor(Math.random() * 4) + 1;
-                    await reactionButtons![randomIndex === 3 ? 4 : randomIndex].click();
-                    await page.waitForTimeout(1000);
+                    }
+                    if (givenReaction) {
+                      continue;
+                    }
+                    if (commentsToBeLiked.includes(i)) {
+                      message.info({
+                        key: "uploading",
+                        content: `Reacting to comment ${i + 1}`,
+                      });
+                      const like = await comment.$(
+                        `div[aria-label="Like"][role="button"]`
+                      );
+                      if (!like) {
+                        message.error({
+                          content: `Error getting like button for comment ${i + 1
+                            } for profile ${i + 1}`,
+                          key: "uploading",
+                        });
+                        return;
+                      }
+                      await like?.hover();
+                      await page.waitForSelector(
+                        `div[aria-label="Reactions"][role="dialog"]`,
+                        {
+                          timeout: 0,
+                        }
+                      );
+                      const reactionsDialog = await page.$(
+                        `div[aria-label="Reactions"][role="dialog"]`
+                      );
+                      const reactionButtons = await reactionsDialog?.$$(
+                        "div[role='button']"
+                      );
+                      const randomIndex =
+                        Math.floor(Math.random() * 10) < 6
+                          ? 0
+                          : Math.floor(Math.random() * 4) + 1;
+                      await reactionButtons![randomIndex === 3 ? 4 : randomIndex].click();
+                      await page.waitForTimeout(1000);
+                    }
                   }
                 }
 
@@ -538,7 +533,7 @@ function App() {
                     Number(values.time) * 60 * 1000 :
                     Number(values.time) * 1000));
               } catch (error) {
-                // console.log(error);
+                console.log(error);
                 message.error({
                   content: `Error reacting to comments for profile ${i + 1}`,
                   key: "uploading",
