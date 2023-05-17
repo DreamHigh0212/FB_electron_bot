@@ -3,10 +3,8 @@ import { Button, Form, Input, message, Select, Upload } from "antd";
 import { RcFile } from "antd/es/upload";
 import { BsFillInboxesFill } from "react-icons/bs";
 import Playwright from "playwright";
-const fs = window.require("fs");
+import Papa from 'papaparse';
 const playwright = window.require("playwright");
-const csv = window.require("csv-parser");
-const path = window.require("path");
 const { Dragger } = Upload;
 
 interface Profile {
@@ -19,44 +17,25 @@ interface Profile {
   Post: string;
 }
 // get data from csv file and return it as array of objects
-const getDataFromCsvAsArray = (path: string) => {
-  const profiles: Profile[] = [];
+const getDataFromCsvAsArray = (csv: RcFile) => {
 
   return new Promise<Profile[]>((resolve, reject) => {
-    fs.createReadStream(path)
-      .pipe(csv())
-      .on("data", (data: Profile) => profiles.push(data))
-      .on("end", () => {
-        resolve(profiles);
-      })
-      .on("error", (error: any) => {
+    Papa.parse(csv, {
+      header: true,
+      skipEmptyLines: true,
+      complete: function (results: any) {
+        resolve(results.data as Profile[]);
+      },
+      error: function (error: any) {
         reject(error);
-      });
+      }
+
+    });
   });
 };
-
-// let checkIfTheyAreMoreComments = async (post: Playwright.ElementHandle<HTMLElement | SVGElement> ) => {
-//   try {
-
-//     return true;
-//   } catch (error) {
-//     return false;
-//   }
-// }
 
 // convert csv file into buffer
-const convertcsvIntoBuffer = (csv: RcFile) => {
-  return new Promise<Buffer>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      resolve(Buffer.from(reader.result as ArrayBuffer));
-    };
-    reader.onerror = () => {
-      reject(reader.error);
-    };
-    reader.readAsArrayBuffer(csv);
-  });
-};
+
 function App() {
   const [csv, setCsv] = useState<RcFile | null>(null);
   // const [started, setStarted] = useState(false);
@@ -67,29 +46,12 @@ function App() {
     timeType: "hours" | "minutes" | "seconds" | "milliseconds";
   }) => {
     // setStarted(true);
-    const csvBuffer = await convertcsvIntoBuffer(csv!);
-    message.loading({ content: "Uploading...", key: "uploading" });
 
-    try {
-      if (!fs.existsSync(path.join(__dirname, "../cache"))) {
-        fs.mkdirSync(path.join(__dirname, "../cache"));
-      }
-      // save file(buffer)
-      const filePath = path.join(__dirname, "../cache/data.csv");
-
-      fs.writeFileSync(filePath, csvBuffer);
-      message.success({ content: "Uploaded csv", key: "uploading" });
-    } catch (error) {
-      console.log(error);
-      message.error({ content: "Error uploading csv", key: "uploading" });
-      // setStarted(false);
-      return;
-    }
     message.loading({ content: "Importing data", key: "uploading" });
     // import data
     try {
-      const filePath = path.join(__dirname, "../cache/data.csv");
-      const csvData = await getDataFromCsvAsArray(filePath);
+
+      const csvData = await getDataFromCsvAsArray(csv!);
       message.success({ content: "Imported data", key: "uploading" });
       try {
         for (let i = 0; i <= csvData.length; i++) {
@@ -128,7 +90,7 @@ function App() {
             // proxy: {
             //   server: proxyserver,
             //   username: proxyusername,
-            //   password: proxypassword,
+            //   password: proxypassword, 
             // },
           });
           await browser
@@ -207,7 +169,7 @@ function App() {
                 });
                 for (let i = 0; i < reactions.length; i++) {
                   try {
-                    const reaction = reactions[i];
+                    const reaction = reactions[i === 3 ? 4 : i];
                     const reactionButton = await post?.$(
                       `div[aria-label="Remove ${reaction}"][role="button"]`
                     );
@@ -246,7 +208,7 @@ function App() {
                   // random index(60 % chance of liking, 40 % chance of other reactions)
                   const randomIndex =
                     Math.random() < 0.6 ? 0 : 1 + Math.floor(Math.random() * 4);
-                  await reactionButtons![randomIndex]?.click();
+                  await reactionButtons![randomIndex === 3 ? 4 : randomIndex]?.click();
                 }
                 message.info({
                   key: "uploading",
@@ -258,11 +220,27 @@ function App() {
                 );
                 await commentBox?.click();
                 let posts = csvData[i]["Post"].split("\n");
-                await commentBox?.type(posts[0], { delay: 30 });
+                await commentBox?.type(posts[0],);
                 await page.keyboard.press("Enter");
-                // await the comment to be posted(by checking if the post contain the comment which don't have )
-                // check if there is an autospan which has `Posting...` as text in it
-                await page.waitForTimeout(5000);
+                while (true) {
+                  try {
+                    let autoSpans = await post?.$$(`span[dir="auto"]`);
+                    let postingSpans = [];
+                    for (let i = 0; i < autoSpans!.length; i++) {
+                      let posting = await autoSpans![i].innerText();
+                      if (posting === "Posting...") {
+                        postingSpans.push(autoSpans![i])
+                      }
+                    }
+                    if (postingSpans.length > 0) {
+                      await page.waitForTimeout(1000);
+                    } else {
+                      break;
+                    }
+                  } catch (error) {
+                    break;
+                  }
+                }
                 await browser.close();
                 message.success({
                   content: "Successfully commented on post and liked it",
@@ -417,16 +395,18 @@ function App() {
                 await allCommentsItem?.click();
                 await post?.waitForSelector(`div[role="article"]`);
                 // click on the following button then then it will disapper but if they're still more comments it will be there(just continue clicking on it)
-                let moreComments = await post?.$(
-                  `div.x78zum5.x13a6bvl.xexx8yu.x1pi30zi.x18d9i69.x1swvt13.x1n2onr6 > div.x78zum5.x1iyjqo2.x21xpn4.x1n2onr6`
-                );
 
-                while (moreComments) {
-                  await moreComments?.click();
-                  await page?.waitForTimeout(3000);
-                  moreComments = await post?.$(
-                    `div.x78zum5.x13a6bvl.xexx8yu.x1pi30zi.x18d9i69.x1swvt13.x1n2onr6 > div.x78zum5.x1iyjqo2.x21xpn4.x1n2onr6`
-                  );
+
+                while (true) {
+                  try {
+                    let eleme = await post?.$(`div.x78zum5.x13a6bvl.xexx8yu.x1pi30zi.x18d9i69.x1swvt13.x1n2onr6 > div.x78zum5.x1iyjqo2.x21xpn4.x1n2onr6`);
+                    if (!eleme) {
+                      break;
+                    }
+                    await eleme!.click();
+                  } catch {
+                    break;
+                  }
                 }
 
                 const comments = await post?.$$(`div[role="article"]`);
@@ -445,6 +425,34 @@ function App() {
                   });
                   return;
                 }
+                let minimumCommentsToBeLiked = 5; // min comments to be liked
+                let maxCommentsToBeLiked = csvData.length - 1; // max comments to be liked
+                let randomNumberOfCommentsToBeLiked = Math.floor(
+                  Math.random() *
+                  (maxCommentsToBeLiked - minimumCommentsToBeLiked + 1) +
+                  minimumCommentsToBeLiked
+                );
+
+                if (comments.length < minimumCommentsToBeLiked) {
+                  minimumCommentsToBeLiked = comments.length / 2;
+                }
+                if (comments.length < maxCommentsToBeLiked) {
+                  maxCommentsToBeLiked = comments.length;
+                }
+
+                // the comments must be liked at random too.
+
+                const commentsToBeLiked: number[] = [];
+                while (commentsToBeLiked.length < randomNumberOfCommentsToBeLiked) {
+                  const randomCommentIndex = Math.floor(
+                    Math.random() * (maxCommentsToBeLiked - minimumCommentsToBeLiked + 1) +
+                    minimumCommentsToBeLiked
+                  );
+                  if (!commentsToBeLiked.includes(randomCommentIndex)) {
+                    commentsToBeLiked.push(randomCommentIndex);
+                  }
+                }
+
                 for (let i = 0; i < comments.length; i++) {
                   const comment = comments[i];
                   // check if comment is already liked, given Love, Care to it
@@ -455,7 +463,7 @@ function App() {
                   });
                   for (let i = 0; i < reactions.length; i++) {
                     try {
-                      const reaction = reactions[i];
+                      const reaction = reactions[i === 3 ? 4 : i];
                       const reactionButton = await comment.$(
                         `div[aria-label="Remove ${reaction}"][role="button"]`
                       );
@@ -467,12 +475,14 @@ function App() {
                       continue;
                     }
                   }
-                  if (!givenReaction) {
+                  if (givenReaction) {
+                    continue;
+                  }
+                  if (commentsToBeLiked.includes(i)) {
                     message.info({
                       key: "uploading",
                       content: `Reacting to comment ${i + 1}`,
                     });
-
                     const like = await comment.$(
                       `div[aria-label="Like"][role="button"]`
                     );
@@ -501,9 +511,11 @@ function App() {
                       Math.floor(Math.random() * 10) < 6
                         ? 0
                         : Math.floor(Math.random() * 4) + 1;
-                    await reactionButtons![randomIndex].click();
+                    await reactionButtons![randomIndex === 3 ? 4 : randomIndex].click();
+                    await page.waitForTimeout(1000);
                   }
                 }
+
                 message.success({
                   content: `Successfully reacted to all comments for profile ${i + 1
                     }`,
@@ -521,7 +533,7 @@ function App() {
                     Number(values.time) * 60 * 1000 :
                     Number(values.time) * 1000));
               } catch (error) {
-                console.log(error);
+                // console.log(error);
                 message.error({
                   content: `Error reacting to comments for profile ${i + 1}`,
                   key: "uploading",
@@ -529,7 +541,7 @@ function App() {
               }
             })
             .catch((error: any) => {
-              console.log(error);
+              // console.log(error);
               message.error({
                 content: `Error opening browser for profile ${i + 1}`,
                 key: "uploading",
@@ -537,13 +549,14 @@ function App() {
             });
         }
       } catch (error) {
-        console.log(error);
+        // console.log(error);
         message.error({
           key: "uploading",
           content: "Error ",
         });
       }
     } catch (error) {
+      // console.log(error)
       message.error({
         content: "Error importing data ",
         key: "uploading",
